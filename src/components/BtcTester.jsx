@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 
-import { LedgerSignerBtc } from "@tetherto/wdk-wallet-btc/signers";
-import { WalletAccountBtc } from "@tetherto/wdk-wallet-btc";
+// import { LedgerSignerBtc } from "@tetherto/wdk-wallet-btc/signers";
+import { ElectrumWs, WalletAccountBtc } from "@tetherto/wdk-wallet-btc";
 export default function BtcTester() {
   const [path, setPath] = useState(`19999'/0/0`);
   const [accountIndex, setAccountIndex] = useState(0);
-  const [network, setNetwork] = useState("testnet");
+  const [network, setNetwork] = useState("regtest");
   const [status, setStatus] = useState("idle");
   const [address, setAddress] = useState("—");
+  const [balance, setBalance] = useState("—");
   const [wallet, setWallet] = useState(null);
   const [logs, setLogs] = useState([]);
 
@@ -27,13 +28,20 @@ export default function BtcTester() {
       `createSigner: path=${path} accountIndex=${accountIndex} network=${network}`
     );
     console.log("Creating signer");
-    const signer = new LedgerSignerBtc(path, { bip: 84, network: network });
-    const wallet = new WalletAccountBtc(signer);
-    // console.log("Wallet created");
-    // setWallet(wallet);
-    setWallet(signer);
+    // const signer = new LedgerSignerBtc(path, { bip: 84, network: network });
+    const wallet = new WalletAccountBtc(
+      "cook voyage document eight skate token alien guide drink uncle term abuse",
+      "0'/0/0",
+      {
+        client: new ElectrumWs("ws://127.0.0.1:50044"),
+        network: "regtest",
+      }
+    );
+    console.log("Wallet created");
+    setWallet(wallet);
+    // setWallet(signer);
     setTimeout(() => {
-      console.log("signer created", signer);
+      console.log("signer created", wallet);
       // console.log("wallet created", wallet);
       setStatus("ready");
       appendLog("signer created");
@@ -43,11 +51,22 @@ export default function BtcTester() {
   const handleGetAddress = async () => {
     setStatus("getting address…");
     appendLog("getAddress clicked");
-    // TODO (wire later):
-    // const addr = await wallet.getAddress()
-    const addr = wallet.address;
+    const addr = await wallet.getAddress();
     setAddress(addr);
     appendLog(`address: ${addr}`);
+    setTimeout(() => {
+      setStatus("idle");
+    }, 150);
+  };
+
+  const handleGetBalance = async () => {
+    setStatus("getting balance…");
+    appendLog("getBalance clicked");
+    const value = await wallet.getBalance();
+    const display =
+      typeof value === "bigint" ? value.toString() : String(value);
+    setBalance(display);
+    appendLog(`balance: ${display} sats`);
     setTimeout(() => {
       setStatus("idle");
     }, 150);
@@ -127,6 +146,7 @@ export default function BtcTester() {
         <div style={fieldRowStyle}>
           <button onClick={handleCreateSigner}>Create Signer</button>
           <button onClick={handleGetAddress}>Get Address</button>
+          <button onClick={handleGetBalance}>Get Balance</button>
           <button onClick={handleSignMessage}>Sign Message</button>
           <button onClick={handleVerifyMessage}>Verify Message</button>
           <button onClick={handleSignTx}>Sign Transaction</button>
@@ -139,6 +159,9 @@ export default function BtcTester() {
           </div>
           <div>
             <b>Address:</b> {address}
+          </div>
+          <div>
+            <b>Balance (sats):</b> {balance}
           </div>
         </div>
       </div>
