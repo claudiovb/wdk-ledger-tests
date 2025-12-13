@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@tetherto/wdk-wallet-btc": "github:HumanRupert/wdk-wallet-btc#feat/add-pluggable-transport",
-    "@tetherto/wdk-wallet-evm": "github:sontuphan/wdk-wallet-evm#poc-ledger-signer",
+    "@tetherto/wdk-wallet-evm": "file:/Users/claudiovilasboas/Desktop/Tether/wdk-wallet-github/wdk-wallet-evm",
     "assert": "^2.1.0",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",

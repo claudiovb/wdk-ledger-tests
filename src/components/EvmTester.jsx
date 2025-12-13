@@ -48,7 +48,9 @@ export default function EvmTester() {
         const { LedgerSignerEvm } = await import(
           "@tetherto/wdk-wallet-evm/signers"
         );
-        const signer = new LedgerSignerEvm(path, { provider: providerUrl });
+        const signer = await LedgerSignerEvm.createChild(path, {
+          provider: providerUrl,
+        });
         const w = new WalletAccountEvm(signer, { provider: providerUrl });
         setWallet(w);
         appendLog("ledger signer initialized (connecting via WebHID)...");

@@ -45,6 +45,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+     exclude: ['@tetherto/wdk-wallet-evm'],
     include: [
       'buffer',
       'process',
@@ -57,6 +58,11 @@ export default defineConfig({
       'events',
       'path-browserify',
       'string_decoder',
+      '@ledgerhq/context-module',
+      '@ledgerhq/device-management-kit',
+      '@ledgerhq/device-transport-kit-web-hid',
+      '@ledgerhq/device-signer-kit-ethereum',
+      '@ledgerhq/signer-utils',
     ],
     esbuildOptions: {
       define: {
@@ -71,4 +77,12 @@ export default defineConfig({
       ],
     },
   },
+  server: {
+  fs: {
+    allow: [
+      '/Users/claudiovilasboas/Desktop/Tether/wdk-ledger-tests/web',
+      '/Users/claudiovilasboas/Desktop/Tether/wdk-wallet-github/wdk-wallet-evm',
+    ],
+  }
+}
 })
