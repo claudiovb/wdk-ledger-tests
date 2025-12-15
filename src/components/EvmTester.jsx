@@ -48,12 +48,27 @@ export default function EvmTester() {
         const { LedgerSignerEvm } = await import(
           "@tetherto/wdk-wallet-evm/signers"
         );
-        const signer = await LedgerSignerEvm.createChild(path, {
-          provider: providerUrl,
-        });
+        const signer = new LedgerSignerEvm(path);
         const w = new WalletAccountEvm(signer, { provider: providerUrl });
         setWallet(w);
-        appendLog("ledger signer initialized (connecting via WebHID)...");
+        appendLog(
+          "ledger signer initialized. Attempting connection via WebHID…"
+        );
+        setStatus("connecting ledger…");
+        try {
+          const resolvedAddr = await w.getAddress();
+          setAddress(resolvedAddr);
+          appendLog(`ledger address: ${resolvedAddr}`);
+        } catch (e) {
+          appendLog(
+            `ledger connect error: ${
+              e?.message || e
+            }. Ensure WebHID is allowed, device is unlocked, and Ethereum app is open.`,
+            "error"
+          );
+          setStatus("idle");
+          return;
+        }
       }
       setStatus("ready");
     } catch (e) {
