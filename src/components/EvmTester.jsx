@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 
-import { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
+import WalletManagerEvm, { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
+import {
+  SeedSignerEvm,
+  LedgerSignerEvm,
+} from "@tetherto/wdk-wallet-evm/signers";
 
 export default function EvmTester() {
   const [path, setPath] = useState(`0'/0/12345`);
@@ -16,6 +20,11 @@ export default function EvmTester() {
   const [address, setAddress] = useState("—");
   const [balance, setBalance] = useState("—");
   const [wallet, setWallet] = useState(null);
+  const [manager, setManager] = useState(null);
+  const [managerAccounts, setManagerAccounts] = useState([]); // { key, path, address, account }
+  const [mgrIndex, setMgrIndex] = useState(0);
+  const [mgrPath, setMgrPath] = useState(`0'/0/0`);
+  const [selectedMgrKey, setSelectedMgrKey] = useState("");
   const [signature, setSignature] = useState("");
   const [logs, setLogs] = useState([]);
 
@@ -109,6 +118,88 @@ export default function EvmTester() {
     }
   };
 
+  const handleCreateManager = async () => {
+    setStatus("creating manager…");
+    appendLog(`createManager: type=${signerType} provider=${providerUrl}`);
+    try {
+      let mgr;
+      if (signerType === "seed") {
+        const root = new SeedSignerEvm(seed);
+        mgr = new WalletManagerEvm(root, { provider: providerUrl });
+      } else {
+        appendLog(
+          "ledger selected for manager: ensure 'Ethereum' app is open on your Ledger device."
+        );
+        const ledgerRoot = new LedgerSignerEvm(`0'`);
+        mgr = new WalletManagerEvm(ledgerRoot, { provider: providerUrl });
+      }
+      setManager(mgr);
+      setManagerAccounts([]);
+      setSelectedMgrKey("");
+      appendLog("manager created");
+      setStatus("ready");
+    } catch (e) {
+      appendLog(`createManager error: ${e?.message || e}`, "error");
+      setStatus("idle");
+    }
+  };
+
+  const handleManagerAddByIndex = async () => {
+    if (!manager) return;
+    setStatus("adding account by index…");
+    appendLog(`manager.getAccount index=${mgrIndex}`);
+    try {
+      const account = await manager.getAccount(Number(mgrIndex) || 0);
+      const addr = await account.getAddress();
+      const path = account.path;
+      const key = `idx:${mgrIndex}:${addr}`;
+      setManagerAccounts((prev) => [
+        ...prev,
+        { key, path, address: addr, account },
+      ]);
+      appendLog(`added account idx=${mgrIndex} path=${path} addr=${addr}`);
+    } catch (e) {
+      appendLog(`manager.getAccount error: ${e?.message || e}`, "error");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const handleManagerAddByPath = async () => {
+    if (!manager) return;
+    setStatus("adding account by path…");
+    appendLog(`manager.getAccountByPath path=${mgrPath}`);
+    try {
+      const account = await manager.getAccountByPath(mgrPath);
+      const addr = await account.getAddress();
+      const path = account.path;
+      const key = `path:${mgrPath}:${addr}`;
+      setManagerAccounts((prev) => [
+        ...prev,
+        { key, path, address: addr, account },
+      ]);
+      appendLog(`added account path=${path} addr=${addr}`);
+    } catch (e) {
+      appendLog(`manager.getAccountByPath error: ${e?.message || e}`, "error");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const handleSelectManagerAccount = async (key) => {
+    setSelectedMgrKey(key);
+    const entry = managerAccounts.find((a) => a.key === key);
+    if (!entry) return;
+    setWallet(entry.account);
+    try {
+      const addr = await entry.account.getAddress();
+      setAddress(addr);
+      appendLog(`active account set: ${entry.path} (${addr})`);
+    } catch (e) {
+      appendLog(`select account getAddress error: ${e?.message || e}`, "error");
+    }
+  };
+
   const handleSignMessage = async () => {
     if (!wallet) return;
     const msg = "Hello from WDK EVM test";
@@ -170,10 +261,14 @@ export default function EvmTester() {
     appendLog("dispose clicked");
     try {
       wallet?.dispose?.();
+      manager?.dispose?.();
     } catch (e) {
       appendLog(`dispose error: ${e?.message || e}`, "error");
     }
     setWallet(null);
+    setManager(null);
+    setManagerAccounts([]);
+    setSelectedMgrKey("");
     setAddress("—");
     setBalance("—");
     setSignature("");
@@ -243,6 +338,53 @@ export default function EvmTester() {
             Sign Transaction
           </button>
           <button onClick={handleDispose}>Dispose</button>
+        </div>
+
+        <div
+          style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee" }}
+        >
+          <b>Wallet Manager</b>
+          <div style={fieldRowStyle}>
+            <button onClick={handleCreateManager}>Create Manager</button>
+            <label>
+              Account index:{" "}
+              <input
+                type="number"
+                value={mgrIndex}
+                onChange={(e) => setMgrIndex(e.target.value)}
+                style={{ width: 80 }}
+              />
+            </label>
+            <button onClick={handleManagerAddByIndex} disabled={!manager}>
+              Add by Index
+            </button>
+            <label>
+              Derivation path:{" "}
+              <input
+                value={mgrPath}
+                onChange={(e) => setMgrPath(e.target.value)}
+                style={{ width: 140 }}
+              />
+            </label>
+            <button onClick={handleManagerAddByPath} disabled={!manager}>
+              Add by Path
+            </button>
+            <label>
+              Active account:{" "}
+              <select
+                value={selectedMgrKey}
+                onChange={(e) => handleSelectManagerAccount(e.target.value)}
+                disabled={!managerAccounts.length}
+              >
+                <option value="">—</option>
+                {managerAccounts.map((a) => (
+                  <option key={a.key} value={a.key}>
+                    {a.path} — {a.address.slice(0, 10)}…
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         <div>
