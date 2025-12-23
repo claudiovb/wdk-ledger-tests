@@ -140,13 +140,29 @@ export default function EvmTester() {
   };
 
   const handleSignTx = async () => {
+    if (!wallet) return;
     setStatus("signing transaction…");
-    appendLog("signTransaction clicked");
-    // For parity with BtcTester, keep this as a placeholder for now.
-    setTimeout(() => {
-      appendLog("tx signed: <placeholder>");
+    const to = "0x2dd68bc0e919931faa1e4233ec4a9c2b7e1e784c";
+    const valueWei = 100000000000000n; // 0.0001 ETH
+    appendLog(
+      `sendTransaction: to=${to} value=${valueWei.toString()} wei (0.0001 ETH)`
+    );
+    try {
+      const { hash, fee } = await wallet.sendTransaction({
+        to,
+        value: valueWei,
+      });
+      appendLog(`tx hash: ${hash}`);
+      if (fee !== undefined) {
+        const feeDisplay =
+          typeof fee === "bigint" ? fee.toString() : String(fee);
+        appendLog(`estimated fee: ${feeDisplay} wei`);
+      }
+    } catch (e) {
+      appendLog(`sendTransaction error: ${e?.message || e}`, "error");
+    } finally {
       setStatus("idle");
-    }, 250);
+    }
   };
 
   const handleDispose = () => {
@@ -161,6 +177,7 @@ export default function EvmTester() {
     setAddress("—");
     setBalance("—");
     setSignature("");
+    appendLog("disposed");
     setStatus("idle");
   };
 
@@ -222,7 +239,9 @@ export default function EvmTester() {
           >
             Verify Message
           </button>
-          <button onClick={handleSignTx}>Sign Transaction</button>
+          <button onClick={handleSignTx} disabled={!wallet}>
+            Sign Transaction
+          </button>
           <button onClick={handleDispose}>Dispose</button>
         </div>
 
