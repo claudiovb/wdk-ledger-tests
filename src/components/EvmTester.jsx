@@ -1,11 +1,8 @@
 import { useMemo, useState } from "react";
 
 import WalletManagerEvm, { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
-import {
-  SeedSignerEvm,
-  LedgerSignerEvm,
-} from "@tetherto/wdk-wallet-evm/signers";
-
+import { SeedSignerEvm } from "@tetherto/wdk-wallet-evm/signers";
+import LedgerSignerEvm from "@tetherto/wdk-wallet-evm/signers/ledger";
 export default function EvmTester() {
   const [path, setPath] = useState(`0'/0/12345`);
   const [providerUrl, setProviderUrl] = useState(
@@ -53,9 +50,6 @@ export default function EvmTester() {
       } else {
         appendLog(
           "ledger selected: please ensure 'Ethereum' app is open on your Ledger device."
-        );
-        const { LedgerSignerEvm } = await import(
-          "@tetherto/wdk-wallet-evm/signers"
         );
         const signer = new LedgerSignerEvm(path);
         const w = new WalletAccountEvm(signer, { provider: providerUrl });
