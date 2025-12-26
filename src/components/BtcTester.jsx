@@ -1,15 +1,23 @@
 import { useMemo, useState } from "react";
 
-// import { LedgerSignerBtc } from "@tetherto/wdk-wallet-btc/signers";
 import { ElectrumWs, WalletAccountBtc } from "@tetherto/wdk-wallet-btc";
+import { SeedSignerBtc } from "@tetherto/wdk-wallet-btc/signers";
+import LedgerSignerBtc from "@tetherto/wdk-wallet-btc/signers/ledger";
+
 export default function BtcTester() {
-  const [path, setPath] = useState(`19999'/0/0`);
-  const [accountIndex, setAccountIndex] = useState(0);
+  const [signerType, setSignerType] = useState("seed"); // 'seed' | 'ledger'
+  const [seed, setSeed] = useState(
+    "test test test test test test test test test test test junk"
+  );
+  const [path, setPath] = useState(`0'/0/0`);
   const [network, setNetwork] = useState("regtest");
+  const [electrumUrl, setElectrumUrl] = useState("ws://127.0.0.1:50044");
+
   const [status, setStatus] = useState("idle");
   const [address, setAddress] = useState("—");
   const [balance, setBalance] = useState("—");
   const [wallet, setWallet] = useState(null);
+  const [signature, setSignature] = useState("");
   const [logs, setLogs] = useState([]);
 
   const appendLog = (msg, level = "info") => {
@@ -22,92 +30,163 @@ export default function BtcTester() {
     []
   );
 
+  const buildConfig = () => ({
+    client: new ElectrumWs(electrumUrl),
+    network,
+    bip: 84, // default to Native SegWit
+  });
+
   const handleCreateSigner = async () => {
     setStatus("creating signer…");
     appendLog(
-      `createSigner: path=${path} accountIndex=${accountIndex} network=${network}`
+      `createSigner: type=${signerType} path=${path} network=${network} electrum=${electrumUrl}`
     );
-    console.log("Creating signer");
-    // const signer = new LedgerSignerBtc(path, { bip: 84, network: network });
-    const wallet = new WalletAccountBtc(
-      "cook voyage document eight skate token alien guide drink uncle term abuse",
-      "0'/0/0",
-      {
-        client: new ElectrumWs("ws://127.0.0.1:50044"),
-        network: "regtest",
+    try {
+      const config = buildConfig();
+      config.network = "testnet";
+      if (signerType === "seed") {
+        const root = new SeedSignerBtc(seed, config);
+        const child = root.derive(path);
+        const w = new WalletAccountBtc(child);
+        setWallet(w);
+        appendLog("seed signer created");
+      } else {
+        appendLog(
+          "ledger selected: ensure 'Bitcoin' app is open on your Ledger device."
+        );
+        const signer = new LedgerSignerBtc(path, config);
+        appendLog(`signer: ${signer}`);
+        const w = new WalletAccountBtc(signer);
+        appendLog(`wallet: ${w}`);
+        setWallet(w);
+        appendLog(
+          "ledger signer initialized. Attempting connection via WebHID…"
+        );
+        setStatus("connecting ledger…");
+        try {
+          const resolvedAddr = await w.getAddress();
+          setAddress(resolvedAddr);
+          appendLog(`ledger address: ${resolvedAddr}`);
+        } catch (e) {
+          appendLog(
+            `ledger connect error: ${
+              e?.message || e
+            }. Ensure WebHID is allowed, device is unlocked, and Bitcoin app is open.`,
+            "error"
+          );
+          setStatus("idle");
+          return;
+        }
       }
-    );
-    console.log("Wallet created");
-    setWallet(wallet);
-    // setWallet(signer);
-    setTimeout(() => {
-      console.log("signer created", wallet);
-      // console.log("wallet created", wallet);
       setStatus("ready");
-      appendLog("signer created");
-    }, 200);
+    } catch (e) {
+      appendLog(`createSigner error: ${e?.message || e}`, "error");
+      setStatus("idle");
+    }
   };
 
   const handleGetAddress = async () => {
+    if (!wallet) return;
     setStatus("getting address…");
     appendLog("getAddress clicked");
-    const addr = await wallet.getAddress();
-    setAddress(addr);
-    appendLog(`address: ${addr}`);
-    setTimeout(() => {
+    try {
+      const addr = await wallet.getAddress();
+      setAddress(addr);
+      appendLog(`address: ${addr}`);
+    } catch (e) {
+      appendLog(`getAddress error: ${e?.message || e}`, "error");
+    } finally {
       setStatus("idle");
-    }, 150);
+    }
   };
 
   const handleGetBalance = async () => {
+    if (!wallet) return;
     setStatus("getting balance…");
     appendLog("getBalance clicked");
-    const value = await wallet.getBalance();
-    const display =
-      typeof value === "bigint" ? value.toString() : String(value);
-    setBalance(display);
-    appendLog(`balance: ${display} sats`);
-    setTimeout(() => {
+    try {
+      const value = await wallet.getBalance();
+      const display =
+        typeof value === "bigint" ? value.toString() : String(value);
+      setBalance(display);
+      appendLog(`balance: ${display} sats`);
+    } catch (e) {
+      appendLog(`getBalance error: ${e?.message || e}`, "error");
+    } finally {
       setStatus("idle");
-    }, 150);
+    }
   };
 
   const handleSignMessage = async () => {
-    const msg = "Hello from WDK test";
+    if (!wallet) return;
+    const msg = "Hello from WDK BTC test";
     setStatus("signing message…");
     appendLog(`signMessage: "${msg}"`);
-    // TODO (wire later): const sig = await wallet.sign(msg)
-    setTimeout(() => {
-      appendLog("signature: <placeholder-hex>");
+    try {
+      const sig = await wallet.sign(msg);
+      setSignature(sig);
+      appendLog(`signature: ${sig}`);
+    } catch (e) {
+      appendLog(`signMessage error: ${e?.message || e}`, "error");
+    } finally {
       setStatus("idle");
-    }, 200);
+    }
   };
 
   const handleVerifyMessage = async () => {
+    if (!wallet) return;
     setStatus("verifying…");
     appendLog("verifyMessage clicked");
-    // TODO (wire later): const ok = await wallet.verify(msg, sig)
-    setTimeout(() => {
-      appendLog("verify result: true (placeholder)");
+    try {
+      const ok = await wallet.verify("Hello from WDK BTC test", signature);
+      appendLog(`verify result: ${ok}`);
+    } catch (e) {
+      appendLog(`verify error: ${e?.message || e}`, "error");
+    } finally {
       setStatus("idle");
-    }, 150);
+    }
   };
 
   const handleSignTx = async () => {
+    if (!wallet) return;
     setStatus("signing transaction…");
-    appendLog("signTransaction clicked");
-    // TODO (wire later): build regtest PSBT and call signer.signPsbt(psbt)
-    setTimeout(() => {
-      appendLog("psbt signed: <placeholder>");
+    const to =
+      address && address !== "—"
+        ? address
+        : "bcrt1q0000000000000000000000000000000000000x"; // placeholder address if none
+    const valueSats = 1000n; // 1000 sats
+    appendLog(`sendTransaction: to=${to} value=${valueSats.toString()} sats`);
+    try {
+      const { hash, fee } = await wallet.sendTransaction({
+        to,
+        value: valueSats,
+      });
+      appendLog(`tx hash: ${hash}`);
+      if (fee !== undefined) {
+        const feeDisplay =
+          typeof fee === "bigint" ? fee.toString() : String(fee);
+        appendLog(`estimated fee: ${feeDisplay} sats`);
+      }
+    } catch (e) {
+      appendLog(`sendTransaction error: ${e?.message || e}`, "error");
+    } finally {
       setStatus("idle");
-    }, 250);
+    }
   };
 
   const handleDispose = () => {
     setStatus("disposing…");
     appendLog("dispose clicked");
-    // TODO (wire later): wallet?.dispose(); signer?.dispose();
+    try {
+      wallet?.dispose?.();
+    } catch (e) {
+      appendLog(`dispose error: ${e?.message || e}`, "error");
+    }
+    setWallet(null);
     setAddress("—");
+    setBalance("—");
+    setSignature("");
+    appendLog("disposed");
     setStatus("idle");
   };
 
@@ -116,20 +195,18 @@ export default function BtcTester() {
       <div className="card">
         <div style={fieldRowStyle}>
           <label>
-            Derivation path:{" "}
-            <input value={path} onChange={(e) => setPath(e.target.value)} />
+            Signer type:{" "}
+            <select
+              value={signerType}
+              onChange={(e) => setSignerType(e.target.value)}
+            >
+              <option value="seed">Seed</option>
+              <option value="ledger">Ledger</option>
+            </select>
           </label>
           <label>
-            Account index:{" "}
-            <input
-              type="number"
-              min={0}
-              value={accountIndex}
-              onChange={(e) =>
-                setAccountIndex(parseInt(e.target.value || "0", 10))
-              }
-              style={{ width: 100 }}
-            />
+            Derivation path:{" "}
+            <input value={path} onChange={(e) => setPath(e.target.value)} />
           </label>
           <label>
             Network:{" "}
@@ -137,19 +214,54 @@ export default function BtcTester() {
               value={network}
               onChange={(e) => setNetwork(e.target.value)}
             >
+              <option value="regtest">regtest</option>
               <option value="testnet">testnet</option>
               <option value="bitcoin">mainnet</option>
             </select>
           </label>
+          <label style={{ flex: 1, minWidth: 280 }}>
+            Electrum WS URL:{" "}
+            <input
+              value={electrumUrl}
+              onChange={(e) => setElectrumUrl(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </label>
         </div>
+
+        {signerType === "seed" && (
+          <div style={fieldRowStyle}>
+            <label style={{ flex: 1, minWidth: 320 }}>
+              Seed phrase:{" "}
+              <input
+                value={seed}
+                onChange={(e) => setSeed(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </label>
+          </div>
+        )}
 
         <div style={fieldRowStyle}>
           <button onClick={handleCreateSigner}>Create Signer</button>
-          <button onClick={handleGetAddress}>Get Address</button>
-          <button onClick={handleGetBalance}>Get Balance</button>
-          <button onClick={handleSignMessage}>Sign Message</button>
-          <button onClick={handleVerifyMessage}>Verify Message</button>
-          <button onClick={handleSignTx}>Sign Transaction</button>
+          <button onClick={handleGetAddress} disabled={!wallet}>
+            Get Address
+          </button>
+          <button onClick={handleGetBalance} disabled={!wallet}>
+            Get Balance
+          </button>
+          <button onClick={handleSignMessage} disabled={!wallet}>
+            Sign Message
+          </button>
+          <button
+            onClick={handleVerifyMessage}
+            disabled={!wallet || !signature}
+          >
+            Verify Message
+          </button>
+          <button onClick={handleSignTx} disabled={!wallet}>
+            Send Transaction
+          </button>
           <button onClick={handleDispose}>Dispose</button>
         </div>
 
