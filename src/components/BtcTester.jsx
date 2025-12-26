@@ -31,7 +31,7 @@ export default function BtcTester() {
   );
 
   const buildConfig = () => ({
-    client: new ElectrumWs(electrumUrl),
+    client: new ElectrumWs({ url: electrumUrl }),
     network,
     bip: 84, // default to Native SegWit
   });
@@ -43,7 +43,6 @@ export default function BtcTester() {
     );
     try {
       const config = buildConfig();
-      config.network = "testnet";
       if (signerType === "seed") {
         const root = new SeedSignerBtc(seed, config);
         const child = root.derive(path);
@@ -95,6 +94,48 @@ export default function BtcTester() {
       appendLog(`address: ${addr}`);
     } catch (e) {
       appendLog(`getAddress error: ${e?.message || e}`, "error");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const handleFundRegtest = async () => {
+    if (!wallet) return;
+    if (network !== "regtest") {
+      appendLog("Faucet only works on regtest network.", "error");
+      return;
+    }
+    setStatus("funding…");
+    appendLog("fund (regtest) clicked");
+    try {
+      const targetAddr =
+        address && address !== "—" ? address : await wallet.getAddress();
+      setAddress(targetAddr);
+
+      const res = await fetch("/api/faucet/btc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: targetAddr }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      appendLog(`faucet tx: ${data.txid}`);
+      if (data?.minedBlocks) {
+        appendLog(`blocks mined: ${data.minedBlocks}`);
+      }
+
+      const value = await wallet.getBalance();
+      const display =
+        typeof value === "bigint" ? value.toString() : String(value);
+      setBalance(display);
+      appendLog(`updated balance: ${display} sats`);
+    } catch (e) {
+      appendLog(`fund error: ${e?.message || e}`, "error");
     } finally {
       setStatus("idle");
     }
@@ -153,7 +194,7 @@ export default function BtcTester() {
     const to =
       address && address !== "—"
         ? address
-        : "bcrt1q0000000000000000000000000000000000000x"; // placeholder address if none
+        : "bcrt1qquv9lg5g2r4jkr0ahun0ddfg5xntxjelwjpnuw"; // placeholder address if none
     const valueSats = 1000n; // 1000 sats
     appendLog(`sendTransaction: to=${to} value=${valueSats.toString()} sats`);
     try {
@@ -249,6 +290,17 @@ export default function BtcTester() {
           </button>
           <button onClick={handleGetBalance} disabled={!wallet}>
             Get Balance
+          </button>
+          <button
+            onClick={handleFundRegtest}
+            disabled={!wallet || network !== "regtest"}
+            title={
+              network !== "regtest"
+                ? "Faucet only available on regtest"
+                : undefined
+            }
+          >
+            Fund (regtest)
           </button>
           <button onClick={handleSignMessage} disabled={!wallet}>
             Sign Message
