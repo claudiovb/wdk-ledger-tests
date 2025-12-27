@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import { ElectrumWs, WalletAccountBtc } from "@tetherto/wdk-wallet-btc";
 import { SeedSignerBtc } from "@tetherto/wdk-wallet-btc/signers";
@@ -12,6 +12,16 @@ export default function BtcTester() {
   const [path, setPath] = useState(`0'/0/0`);
   const [network, setNetwork] = useState("regtest");
   const [electrumUrl, setElectrumUrl] = useState("ws://127.0.0.1:50044");
+
+  // Automatically update electrumUrl based on network selection
+  useEffect(() => {
+    if (network === "regtest") {
+      setElectrumUrl("ws://127.0.0.1:50044");
+    } else if (network === "testnet") {
+      setElectrumUrl("ws://127.0.0.1:50045");
+    }
+    // For mainnet, keep the current URL (user can manually set it)
+  }, [network]);
 
   const [status, setStatus] = useState("idle");
   const [address, setAddress] = useState("—");
@@ -191,10 +201,15 @@ export default function BtcTester() {
   const handleSignTx = async () => {
     if (!wallet) return;
     setStatus("signing transaction…");
-    const to =
-      address && address !== "—"
-        ? address
-        : "bcrt1qquv9lg5g2r4jkr0ahun0ddfg5xntxjelwjpnuw"; // placeholder address if none
+    let to = "";
+    if (network === "testnet") {
+      to = "tb1qquv9lg5g2r4jkr0ahun0ddfg5xntxjelvmc7t8";
+    } else {
+      to =
+        address && address !== "—"
+          ? address
+          : "bcrt1qquv9lg5g2r4jkr0ahun0ddfg5xntxjelwjpnuw"; // placeholder address if none
+    }
     const valueSats = 1000n; // 1000 sats
     appendLog(`sendTransaction: to=${to} value=${valueSats.toString()} sats`);
     try {

@@ -13,6 +13,7 @@ const HOST = '127.0.0.1'
 const RPC_PORT = 18443
 const ELECTRUM_TCP_PORT = 50001
 const WS_PROXY_PORT = 50044
+const WS_PROXY_PORT_TESTNET = 50045
 const DATA_DIR = resolve(ROOT, '.regtest-data')
 
 const BITCOIN_CLI = `bitcoin-cli -regtest -rpcconnect=${HOST} -rpcport=${RPC_PORT} -datadir=${DATA_DIR}`
@@ -76,6 +77,7 @@ async function main () {
   killOnPort(RPC_PORT)
   killOnPort(ELECTRUM_TCP_PORT)
   killOnPort(WS_PROXY_PORT)
+  killOnPort(WS_PROXY_PORT_TESTNET)
 
   // Start bitcoind (daemonized)
   execSync(
@@ -111,7 +113,7 @@ async function main () {
   const addr = bitcoinCall('getnewaddress', true)
   bitcoinCall(`generatetoaddress 101 ${addr}`, false)
 
-  // Start WS proxy that forwards to electrum TCP
+  // Start WS proxy that forwards to electrum TCP (regtest)
   const proxy = spawn(process.execPath, [
     resolve(__dirname, 'ws-proxy.js'),
     `--tcp-host=${HOST}`,
@@ -120,11 +122,22 @@ async function main () {
   ], { stdio: 'inherit', detached: true })
   proxy.unref()
 
-  // Ensure the WS port is accepting TCP before exiting
+  // Start WS proxy that forwards to testnet electrum TCP
+  const proxyTestnet = spawn(process.execPath, [
+    resolve(__dirname, 'ws-proxy.js'),
+    `--tcp-host=electrum.blockstream.info`,
+    `--tcp-port=60001`,
+    `--ws-port=${WS_PROXY_PORT_TESTNET}`
+  ], { stdio: 'inherit', detached: true })
+  proxyTestnet.unref()
+
+  // Ensure both WS ports are accepting TCP before exiting
   await waitPortOpen(HOST, WS_PROXY_PORT)
+  await waitPortOpen(HOST, WS_PROXY_PORT_TESTNET)
 
   console.log('[regtest] bitcoind + electrs ready')
   console.log(`[regtest] WS proxy listening on ws://${HOST}:${WS_PROXY_PORT}`)
+  console.log(`[testnet] WS proxy listening on ws://${HOST}:${WS_PROXY_PORT_TESTNET}`)
   console.log('[regtest] You can now run Vite.')
 }
 
