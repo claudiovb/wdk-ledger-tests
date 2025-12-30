@@ -35,19 +35,15 @@ wss.on('connection', (ws) => {
   ws.on('error', (e) => { console.error('[ws-proxy] ws error:', e.message); closeBoth() })
 
   ws.on('message', (data) => {
-    console.log('[ws-proxy] ws message:', data)
     try {
       const msg = typeof data === 'string' ? data : data.toString()
       sock.write(msg + '\n')
-      console.log('wrote to tcp')
     } catch {
-      console.log('error writing to tcp')
       closeBoth()
     }
   })
 
   sock.on('data', (chunk) => {
-    console.log('[ws-proxy] tcp data:', chunk.toString())
     const lines = chunk.toString().split('\n').filter(Boolean)
     for (const line of lines) {
       try { ws.send(line) } catch { closeBoth() }

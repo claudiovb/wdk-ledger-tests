@@ -211,7 +211,7 @@ export default function BtcTester() {
     setStatus("signing transaction…");
     let to = "";
     if (network === "testnet") {
-      to = "tb1qquv9lg5g2r4jkr0ahun0ddfg5xntxjelvmc7t8";
+      to = "myBMnGUc9x4MTYJxH3jH6HKh2UJvfLC6Nz";
     } else {
       to =
         address && address !== "—"
